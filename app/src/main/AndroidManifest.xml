@@ -27,7 +27,7 @@
             android:exported="true" />
 
         <activity
-            android:name="com.example.pa.MainActivity"
+            android:name="com.example.pa_bai5.MainActivity"
             android:exported="true" />
 
         <activity

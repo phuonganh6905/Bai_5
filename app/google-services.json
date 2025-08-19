@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "925061424054",
-    "project_id": "pabai5",
-    "storage_bucket": "pabai5.firebasestorage.app"
+    "project_number": "184719612643",
+    "project_id": "ppappa-67b81",
+    "storage_bucket": "ppappa-67b81.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:925061424054:android:eca8a2238845f7d2b1d717",
+        "mobilesdk_app_id": "1:184719612643:android:c17b4b1fbffd656938c3d6",
         "android_client_info": {
           "package_name": "com.example.pa_bai5"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCxTJSOi9k2PJ60Bp52mQnl3k8Dw67pRTs"
+          "current_key": "AIzaSyAijHom68DoVDWmn1p3fI_CVJ6EdeJfmMw"
         }
       ],
       "services": {

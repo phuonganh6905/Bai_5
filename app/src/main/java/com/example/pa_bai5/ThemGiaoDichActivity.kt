@@ -1,8 +1,5 @@
 package com.example.pa_bai5
 
-
-import android.app.Activity
-import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -11,9 +8,13 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 class ThemGiaoDichActivity : AppCompatActivity() {
 
@@ -27,11 +28,14 @@ class ThemGiaoDichActivity : AppCompatActivity() {
     private lateinit var nutLuu: Button
 
     private var danhMucDuocChon: String = ""
+
     private val cacDanhMucThu = arrayOf("Lương", "Thưởng", "Đầu tư", "Khác")
     private val cacDanhMucChi = arrayOf("Ăn uống", "Di chuyển", "Mua sắm", "Khác")
     private var cacDanhMuc = cacDanhMucChi
+
     private var soTienThuc: Double? = null
     private var ngayDuocChon: Calendar = Calendar.getInstance()
+    private var isSaving = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +51,7 @@ class ThemGiaoDichActivity : AppCompatActivity() {
         nutLuu = findViewById(R.id.nutLuu)
 
         nutLuu.isEnabled = false
+
 
         oNhapSoTien.addTextChangedListener(object : TextWatcher {
             private var isEditing = false
@@ -75,7 +80,7 @@ class ThemGiaoDichActivity : AppCompatActivity() {
                     oNhapSoTien.setText(formatted)
                     oNhapSoTien.setSelection(formatted.length)
                     oNhapSoTien.error = null
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     soTienThuc = null
                     oNhapSoTien.error = "Vui lòng nhập số hợp lệ"
                 }
@@ -85,24 +90,26 @@ class ThemGiaoDichActivity : AppCompatActivity() {
             }
         })
 
+
         nhomLuaChonLoai.setOnCheckedChangeListener { _, checkedId ->
             capNhatTrangThaiNutLuu()
             when (checkedId) {
                 R.id.radioThu -> {
-                    capNhatMauGiaoDien(Color.parseColor("#388E3C")) // xanh lá
+                    capNhatMauGiaoDien(Color.parseColor("#388E3C")) // xanh
                     cacDanhMuc = cacDanhMucThu
                 }
                 R.id.radioChi -> {
-                    capNhatMauGiaoDien(Color.RED)
+                    capNhatMauGiaoDien(Color.RED) // đỏ
                     cacDanhMuc = cacDanhMucChi
                 }
             }
             oChonDanhMuc.text = "Chọn danh mục"
             danhMucDuocChon = ""
+            oChonDanhMuc.error = null
         }
 
         oChonDanhMuc.setOnClickListener {
-            AlertDialog.Builder(this)
+            androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Chọn danh mục")
                 .setItems(cacDanhMuc) { _, which ->
                     danhMucDuocChon = cacDanhMuc[which]
@@ -132,39 +139,56 @@ class ThemGiaoDichActivity : AppCompatActivity() {
             datePickerDialog.show()
         }
 
-        if (oNhapSoTien.text.toString().isEmpty()) {
-            oNhapSoTien.error = "Vui lòng nhập số tiền"
-        }
-        if (nhomLuaChonLoai.checkedRadioButtonId == -1) {
+        if (oNhapSoTien.text.toString().isEmpty()) oNhapSoTien.error = "Vui lòng nhập số tiền"
+        if (nhomLuaChonLoai.checkedRadioButtonId == -1)
             Toast.makeText(this, "Vui lòng chọn loại giao dịch", Toast.LENGTH_SHORT).show()
-        }
-        if (danhMucDuocChon.isEmpty()) {
-            oChonDanhMuc.error = "Vui lòng chọn danh mục"
-        }
+        if (danhMucDuocChon.isEmpty()) oChonDanhMuc.error = "Vui lòng chọn danh mục"
 
         capNhatTrangThaiNutLuu()
 
         nutLuu.setOnClickListener {
+            if (isSaving) return@setOnClickListener
             if (!kiemTraHopLe()) return@setOnClickListener
 
-            val moTaText = oNhapMoTa.text.toString()
-            val loai = if (radioThu.isChecked) "Thu" else "Chi"
-            val ngay = tvChonNgay.text.toString()
+            isSaving = true
+            nutLuu.isEnabled = false
+            nutLuu.text = "Đang lưu..."
 
-            val giaoDichMoi = GiaoDich(
-                soTien = soTienThuc ?: 0.0,
-                moTa = moTaText,
-                loai = loai,
-                danhMuc = danhMucDuocChon,
-                ngay = ngay
+            val loai = if (radioThu.isChecked) "Thu" else "Chi"
+            val moTaText = oNhapMoTa.text.toString()
+            val ngay = tvChonNgay.text.toString()
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+
+            if (uid == null) {
+                Toast.makeText(this, "Bạn chưa đăng nhập!", Toast.LENGTH_SHORT).show()
+                isSaving = false
+                nutLuu.isEnabled = true
+                nutLuu.text = "Lưu"
+                return@setOnClickListener
+            }
+
+            val data = hashMapOf(
+                "soTien" to (soTienThuc ?: 0.0),
+                "moTa" to moTaText,
+                "loai" to loai,
+                "danhMuc" to danhMucDuocChon,
+                "ngay" to ngay,
+                "createdAt" to FieldValue.serverTimestamp()
             )
 
-            val resultIntent = intent
-            resultIntent.putExtra("transaction", giaoDichMoi)
-            setResult(Activity.RESULT_OK, resultIntent)
-
-            Toast.makeText(this, "Lưu giao dịch thành công!", Toast.LENGTH_SHORT).show()
-            finish()
+            FirebaseFirestore.getInstance()
+                .collection("users").document(uid)
+                .collection("transactions")
+                .add(data)
+                .addOnSuccessListener {
+                    finish() // thoát màn ngay
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, e.localizedMessage ?: "Lỗi lưu dữ liệu", Toast.LENGTH_LONG).show()
+                    isSaving = false
+                    nutLuu.isEnabled = true
+                    nutLuu.text = "Lưu"
+                }
         }
     }
 
@@ -181,29 +205,24 @@ class ThemGiaoDichActivity : AppCompatActivity() {
                 background.setStroke(2, mau)
             }
         }
-
         nutLuu.setTextColor(Color.WHITE)
         nutLuu.setBackgroundColor(mau)
     }
 
     private fun kiemTraHopLe(): Boolean {
         var hopLe = true
-
         if (soTienThuc == null) {
             oNhapSoTien.error = "Vui lòng nhập số tiền"
             hopLe = false
         }
-
         if (nhomLuaChonLoai.checkedRadioButtonId == -1) {
             Toast.makeText(this, "Vui lòng chọn loại giao dịch", Toast.LENGTH_SHORT).show()
             hopLe = false
         }
-
         if (danhMucDuocChon.isEmpty()) {
             oChonDanhMuc.error = "Vui lòng chọn danh mục"
             hopLe = false
         }
-
         return hopLe
     }
 

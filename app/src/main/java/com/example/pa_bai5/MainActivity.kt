@@ -1,17 +1,16 @@
-package com.example.pa
+package com.example.pa_bai5
 
-
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.pa_bai5.GiaoDich
-import com.example.pa_bai5.GiaoDichAdapter
-import com.example.pa_bai5.R
-import com.example.pa_bai5.ThemGiaoDichActivity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,9 +19,14 @@ class MainActivity : AppCompatActivity() {
     private val danhSachGiaoDich = mutableListOf<GiaoDich>()
     private lateinit var giaoDichAdapter: GiaoDichAdapter
 
+    private lateinit var auth: FirebaseAuth
+    private var registration: ListenerRegistration? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        auth = FirebaseAuth.getInstance()
 
         nutThem = findViewById(R.id.nutThem)
         hienThiDanhSach = findViewById(R.id.hienThiDanhSach)
@@ -32,19 +36,46 @@ class MainActivity : AppCompatActivity() {
         hienThiDanhSach.adapter = giaoDichAdapter
 
         nutThem.setOnClickListener {
-            val intent = Intent(this, ThemGiaoDichActivity::class.java)
-            startActivityForResult(intent, 1)
+            startActivity(Intent(this, ThemGiaoDichActivity::class.java))
         }
+
+        val settings = FirebaseFirestoreSettings.Builder()
+            .setPersistenceEnabled(true)
+            .build()
+        FirebaseFirestore.getInstance().firestoreSettings = settings
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
-            val giaoDichMoi = data?.getSerializableExtra("transaction") as? GiaoDich
-            giaoDichMoi?.let {
-                danhSachGiaoDich.add(it)
-                giaoDichAdapter.notifyItemInserted(danhSachGiaoDich.size - 1)
+    override fun onStart() {
+        super.onStart()
+        val user = auth.currentUser ?: return
+
+        registration = FirebaseFirestore.getInstance()
+            .collection("users").document(user.uid)
+            .collection("transactions")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, e ->
+                if (e != null) return@addSnapshotListener
+                danhSachGiaoDich.clear()
+                snap?.documents?.forEach { doc ->
+                    val gd = GiaoDich(
+                        soTien = doc.getDouble("soTien") ?: 0.0,
+                        moTa = doc.getString("moTa") ?: "",
+                        loai = doc.getString("loai") ?: "",
+                        danhMuc = doc.getString("danhMuc") ?: "",
+                        ngay = doc.getString("ngay") ?: ""
+                    )
+                    danhSachGiaoDich.add(gd)
+                }
+                giaoDichAdapter.notifyDataSetChanged()
+                if (danhSachGiaoDich.isNotEmpty()) {
+                    hienThiDanhSach.scrollToPosition(0)
+                }
             }
-        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        registration?.remove()
+        registration = null
     }
 }
